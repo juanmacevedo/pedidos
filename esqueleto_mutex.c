@@ -150,6 +150,7 @@ void* repartidor(void* arg) {
 }
 
 int main() {
+    signal(SIGINT, manejador);
     
 
     init_cola_pendientes(&cola_pendientes);

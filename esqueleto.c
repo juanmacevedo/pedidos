@@ -115,6 +115,7 @@ void* repartidor(void* arg) {
 }
 
 int main() {
+    signal(SIGINT, manejador);
     
 
     int ids_prod[N_PRODUCTORES];
