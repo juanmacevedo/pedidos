@@ -138,8 +138,8 @@ void* productor(void* arg) {
         p.tipo_comida        = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
         p.entregado          = 0;
         sleep(2);
+        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo(%d) — preparacion(%ds) — entregado(%d)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion, p.entregado);
         encolar_pendientes(&cola_pendientes, p);
-        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (preparacion: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
     }
     return NULL;
 }
@@ -148,10 +148,9 @@ void* cocinero(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p = desencolar_pendientes(&cola_pendientes);
-        printf("[COCINERO   %d] Tomó pedido #%d — tipo %d\n", id, p.id, p.tipo_comida);
+        printf("[COCINERO   %d] Tomó pedido #%d — entregado(%d)\n", id, p.id, p.entregado);
         sleep(p.tiempo_preparacion);
         encolar_listos(&cola_listos, p);
-        printf("[COCINERO   %d] Pedido #%d listo\n", id, p.id);
     }
     return NULL;
 }
@@ -164,7 +163,7 @@ void* repartidor(void* arg) {
         p.entregado = 1;
         pthread_mutex_lock(&mutex_entregados);
         total_entregados++;
-        printf("[REPARTIDOR %d] Pedido #%d entregado — tipo %d (total: %d)\n", id, p.id, p.tipo_comida, total_entregados);
+        printf("[REPARTIDOR %d] Pedido #%d — entregado(%d)\n", id, p.id, p.entregado);
         pthread_mutex_unlock(&mutex_entregados);
     }
     return NULL;
