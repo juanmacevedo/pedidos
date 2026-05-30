@@ -134,12 +134,12 @@ void* productor(void* arg) {
         Pedido p;
         p.id                 = generar_id();
         unsigned int semilla = (unsigned int)pthread_self();
-        p.tipo_comida        = rand_r(&semilla) % 3 + 1;
-        p.tiempo_preparacion = p.tipo_comida + 1;
+        p.tipo_comida        = rand_r(&semilla) % 4 + 3;
+        p.tiempo_preparacion = p.tipo_comida;
         p.entregado          = 0;
-        sleep(1);
+        sleep(2);
         encolar_pendientes(&cola_pendientes, p);
-        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (prep: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
+        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (preparacion: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
     }
     return NULL;
 }
@@ -160,7 +160,7 @@ void* repartidor(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p = desencolar_listos(&cola_listos);
-        sleep(1);
+        sleep(2);
         p.entregado = 1;
         pthread_mutex_lock(&mutex_entregados);
         total_entregados++;
