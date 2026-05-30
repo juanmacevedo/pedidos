@@ -5,10 +5,10 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define N_PRODUCTORES  2
-#define M_COCINEROS    3
-#define R_REPARTIDORES 2
-#define TAM_COLA       5
+#define N_PRODUCTORES  3
+#define M_COCINEROS    5
+#define R_REPARTIDORES 8
+#define TAM_COLA       7
 
 typedef struct {
     int id;

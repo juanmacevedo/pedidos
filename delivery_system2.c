@@ -138,8 +138,8 @@ void* productor(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p;
-        unsigned int semilla = (unsigned int)pthread_self() ^ (unsigned int)time(NULL);
         p.id                 = generar_id();
+        unsigned int semilla = (unsigned int)pthread_self() ^ (unsigned int)time(NULL);
         p.tiempo_preparacion = rand_r(&semilla) % 3 + 3;  /* 3, 4, o 5 seg */
         p.tipo_comida        = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
         p.entregado          = 0;
@@ -148,7 +148,7 @@ void* productor(void* arg) {
         total_generados++;
         pthread_mutex_unlock(&mutex_generados);
         printf("[PRODUCTOR %d] Pedido #%d generado — tipo(%d) — preparacion(%ds) — entregado(%d)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion, p.entregado);
-        encolar(&cola_pendientes, p);
+        encolar_pendientes(&cola_pendientes, p);
     }
     return NULL;
 }
@@ -156,13 +156,13 @@ void* productor(void* arg) {
 void* cocinero(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar(&cola_pendientes);
+        Pedido p = desencolar_pendientes(&cola_pendientes);
         printf("[COCINERO %d] Tomó pedido #%d — preparacion(%ds)\n", id, p.id, p.tiempo_preparacion);
         sleep(p.tiempo_preparacion);
         pthread_mutex_lock(&mutex_preparados);
         total_preparados++;
         pthread_mutex_unlock(&mutex_preparados);
-        encolar(&cola_listos, p);
+        encolar_listos(&cola_listos, p);
     }
     return NULL;
 }
@@ -170,7 +170,7 @@ void* cocinero(void* arg) {
 void* repartidor(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar(&cola_listos);
+        Pedido p = desencolar_listos(&cola_listos);
         sleep(2);
         p.entregado = 1;
         pthread_mutex_lock(&mutex_entregados);
