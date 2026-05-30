@@ -134,8 +134,8 @@ void* productor(void* arg) {
         Pedido p;
         p.id                 = generar_id();
         unsigned int semilla = (unsigned int)pthread_self();
-        p.tipo_comida        = rand_r(&semilla) % 4 + 3;
-        p.tiempo_preparacion = p.tipo_comida;
+        p.tiempo_preparacion = rand_r(&semilla) % 3 + 3;  /* 3, 4, o 5 seg */
+        p.tipo_comida        = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
         p.entregado          = 0;
         sleep(2);
         encolar_pendientes(&cola_pendientes, p);
