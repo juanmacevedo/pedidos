@@ -5,39 +5,29 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define N_PRODUCTORES         2
-#define M_COCINEROS           3
-#define R_REPARTIDORES        2
-#define TAM_COLA_PENDIENTES   5
-#define TAM_COLA_LISTOS       5
+#define N_PRODUCTORES  2
+#define M_COCINEROS    3
+#define R_REPARTIDORES 2
+#define TAM_COLA       5
 
 typedef struct {
     int id;
     int tipo_comida;
     int tiempo_preparacion;
-    int entregado;            /* 0 = pendiente, 1 = entregado */
+    int entregado;
 } Pedido;
 
 typedef struct {
-    Pedido items[TAM_COLA_PENDIENTES];
+    Pedido items[TAM_COLA];
     int frente;
     int fin;
     int cantidad;
     sem_t lugares;  /* espacios libres */
     sem_t pedidos;  /* pedidos disponibles */
-} ColaPendientes;
+} Cola;
 
-typedef struct {
-    Pedido items[TAM_COLA_LISTOS];
-    int frente;
-    int fin;
-    int cantidad;
-    sem_t lugares;
-    sem_t pedidos;
-} ColaListos;
-
-ColaPendientes cola_pendientes;
-ColaListos     cola_listos;
+Cola cola_pendientes;
+Cola cola_listos;
 
 int ultimo_id        = 0;
 int total_entregados = 0;
@@ -48,58 +38,29 @@ void manejador(int sig) {
     exit(0);
 }
 
-
-void init_cola_pendientes(ColaPendientes* c) {
+void init_cola(Cola* c) {
     c->frente = c->fin = c->cantidad = 0;
-    sem_init(&c->lugares, 0, TAM_COLA_PENDIENTES);
+    sem_init(&c->lugares, 0, TAM_COLA);
     sem_init(&c->pedidos, 0, 0);
 }
 
-void init_cola_listos(ColaListos* c) {
-    c->frente = c->fin = c->cantidad = 0;
-    sem_init(&c->lugares, 0, TAM_COLA_LISTOS);
-    sem_init(&c->pedidos, 0, 0);
-}
-
-void destroy_cola_pendientes(ColaPendientes* c) {
+void destroy_cola(Cola* c) {
     sem_destroy(&c->lugares);
     sem_destroy(&c->pedidos);
 }
 
-void destroy_cola_listos(ColaListos* c) {
-    sem_destroy(&c->lugares);
-    sem_destroy(&c->pedidos);
-}
-
-void encolar_pendientes(ColaPendientes* c, Pedido p) {
+void encolar(Cola* c, Pedido p) {
     sem_wait(&c->lugares);
     c->items[c->fin] = p;
-    c->fin = (c->fin + 1) % TAM_COLA_PENDIENTES;
+    c->fin = (c->fin + 1) % TAM_COLA;
     c->cantidad++;
     sem_post(&c->pedidos);
 }
 
-Pedido desencolar_pendientes(ColaPendientes* c) {
+Pedido desencolar(Cola* c) {
     sem_wait(&c->pedidos);
     Pedido p = c->items[c->frente];
-    c->frente = (c->frente + 1) % TAM_COLA_PENDIENTES;
-    c->cantidad--;
-    sem_post(&c->lugares);
-    return p;
-}
-
-void encolar_listos(ColaListos* c, Pedido p) {
-    sem_wait(&c->lugares);
-    c->items[c->fin] = p;
-    c->fin = (c->fin + 1) % TAM_COLA_LISTOS;
-    c->cantidad++;
-    sem_post(&c->pedidos);
-}
-
-Pedido desencolar_listos(ColaListos* c) {
-    sem_wait(&c->pedidos);
-    Pedido p = c->items[c->frente];
-    c->frente = (c->frente + 1) % TAM_COLA_LISTOS;
+    c->frente = (c->frente + 1) % TAM_COLA;
     c->cantidad--;
     sem_post(&c->lugares);
     return p;
@@ -113,14 +74,14 @@ void* productor(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p;
-        p.id                 = generar_id();
         unsigned int semilla = (unsigned int)pthread_self();
-        p.tipo_comida        = rand_r(&semilla) % 3 + 1;
-        p.tiempo_preparacion = p.tipo_comida + 1;
+        p.id                 = generar_id();
+        p.tiempo_preparacion = rand_r(&semilla) % 3 + 3;
+        p.tipo_comida        = p.tiempo_preparacion + 10;
         p.entregado          = 0;
-        sleep(1);
-        encolar_pendientes(&cola_pendientes, p);
-        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (prep: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
+        sleep(2);
+        encolar(&cola_pendientes, p);
+        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (preparacion: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
     }
     return NULL;
 }
@@ -128,10 +89,10 @@ void* productor(void* arg) {
 void* cocinero(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar_pendientes(&cola_pendientes);
+        Pedido p = desencolar(&cola_pendientes);
         printf("[COCINERO   %d] Tomó pedido #%d — tipo %d\n", id, p.id, p.tipo_comida);
         sleep(p.tiempo_preparacion);
-        encolar_listos(&cola_listos, p);
+        encolar(&cola_listos, p);
         printf("[COCINERO   %d] Pedido #%d listo\n", id, p.id);
     }
     return NULL;
@@ -140,8 +101,8 @@ void* cocinero(void* arg) {
 void* repartidor(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar_listos(&cola_listos);
-        sleep(1);
+        Pedido p = desencolar(&cola_listos);
+        sleep(2);
         p.entregado = 1;
         total_entregados++;
         printf("[REPARTIDOR %d] Pedido #%d entregado — tipo %d (total: %d)\n", id, p.id, p.tipo_comida, total_entregados);
@@ -151,10 +112,9 @@ void* repartidor(void* arg) {
 
 int main() {
     signal(SIGINT, manejador);
-    
 
-    init_cola_pendientes(&cola_pendientes);
-    init_cola_listos(&cola_listos);
+    init_cola(&cola_pendientes);
+    init_cola(&cola_listos);
 
     int ids_prod[N_PRODUCTORES];
     int ids_coc[M_COCINEROS];
@@ -181,8 +141,8 @@ int main() {
     for (int i = 0; i < M_COCINEROS;    i++) pthread_join(hilos_coc[i],  NULL);
     for (int i = 0; i < R_REPARTIDORES; i++) pthread_join(hilos_rep[i],  NULL);
 
-    destroy_cola_pendientes(&cola_pendientes);
-    destroy_cola_listos(&cola_listos);
+    destroy_cola(&cola_pendientes);
+    destroy_cola(&cola_listos);
 
     return 0;
 }

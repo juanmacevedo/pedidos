@@ -4,37 +4,29 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define N_PRODUCTORES         2
-#define M_COCINEROS           3
-#define R_REPARTIDORES        2
-#define TAM_COLA_PENDIENTES   5
-#define TAM_COLA_LISTOS       5
+#define N_PRODUCTORES  2
+#define M_COCINEROS    3
+#define R_REPARTIDORES 2
+#define TAM_COLA       5
 
 typedef struct {
     int id;
-    int tipo_comida;          /* 1, 2, o 3 */
-    int tiempo_preparacion;   /* igual al tipo: 2, 3, o 4 seg */
+    int tipo_comida;          /* 13, 14, o 15 */
+    int tiempo_preparacion;   /* 3, 4, o 5 seg */
     int entregado;            /* 0 = pendiente, 1 = entregado */
 } Pedido;
 
 typedef struct {
-    Pedido items[TAM_COLA_PENDIENTES];
+    Pedido items[TAM_COLA];
     int frente;
     int fin;
     int cantidad;
-} ColaPendientes;
+} Cola;
 
-typedef struct {
-    Pedido items[TAM_COLA_LISTOS];
-    int frente;
-    int fin;
-    int cantidad;
-} ColaListos;
+Cola cola_pendientes;
+Cola cola_listos;
 
-ColaPendientes cola_pendientes;
-ColaListos     cola_listos;
-
-int ultimo_id       = 0;
+int ultimo_id        = 0;
 int total_entregados = 0;
 
 void manejador(int sig) {
@@ -43,29 +35,15 @@ void manejador(int sig) {
     exit(0);
 }
 
-
-void encolar_pendientes(ColaPendientes* c, Pedido p) {
+void encolar(Cola* c, Pedido p) {
     c->items[c->fin] = p;
-    c->fin = (c->fin + 1) % TAM_COLA_PENDIENTES;
+    c->fin = (c->fin + 1) % TAM_COLA;
     c->cantidad++;
 }
 
-Pedido desencolar_pendientes(ColaPendientes* c) {
+Pedido desencolar(Cola* c) {
     Pedido p = c->items[c->frente];
-    c->frente = (c->frente + 1) % TAM_COLA_PENDIENTES;
-    c->cantidad--;
-    return p;
-}
-
-void encolar_listos(ColaListos* c, Pedido p) {
-    c->items[c->fin] = p;
-    c->fin = (c->fin + 1) % TAM_COLA_LISTOS;
-    c->cantidad++;
-}
-
-Pedido desencolar_listos(ColaListos* c) {
-    Pedido p = c->items[c->frente];
-    c->frente = (c->frente + 1) % TAM_COLA_LISTOS;
+    c->frente = (c->frente + 1) % TAM_COLA;
     c->cantidad--;
     return p;
 }
@@ -78,14 +56,14 @@ void* productor(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p;
-        p.id                 = generar_id();
-        unsigned int semilla = (unsigned int)pthread_self();
-        p.tipo_comida        = rand_r(&semilla) % 3 + 1;
-        p.tiempo_preparacion = p.tipo_comida + 1;
-        p.entregado          = 0;
-        sleep(1);
-        encolar_pendientes(&cola_pendientes, p);
-        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (prep: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
+        unsigned int semilla     = (unsigned int)pthread_self();
+        p.id                     = generar_id();
+        p.tiempo_preparacion     = rand_r(&semilla) % 3 + 3;   /* 3, 4, o 5 seg */
+        p.tipo_comida            = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
+        p.entregado              = 0;
+        sleep(2);
+        encolar(&cola_pendientes, p);
+        printf("[PRODUCTOR  %d] Pedido #%d generado — tipo %d (preparacion: %ds)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion);
     }
     return NULL;
 }
@@ -93,10 +71,10 @@ void* productor(void* arg) {
 void* cocinero(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar_pendientes(&cola_pendientes);
+        Pedido p = desencolar(&cola_pendientes);
         printf("[COCINERO   %d] Tomó pedido #%d — tipo %d\n", id, p.id, p.tipo_comida);
         sleep(p.tiempo_preparacion);
-        encolar_listos(&cola_listos, p);
+        encolar(&cola_listos, p);
         printf("[COCINERO   %d] Pedido #%d listo\n", id, p.id);
     }
     return NULL;
@@ -105,8 +83,8 @@ void* cocinero(void* arg) {
 void* repartidor(void* arg) {
     int id = *(int*)arg;
     while (1) {
-        Pedido p = desencolar_listos(&cola_listos);
-        sleep(1);
+        Pedido p = desencolar(&cola_listos);
+        sleep(2);
         p.entregado = 1;
         total_entregados++;
         printf("[REPARTIDOR %d] Pedido #%d entregado — tipo %d (total: %d)\n", id, p.id, p.tipo_comida, total_entregados);
@@ -116,7 +94,6 @@ void* repartidor(void* arg) {
 
 int main() {
     signal(SIGINT, manejador);
-    
 
     int ids_prod[N_PRODUCTORES];
     int ids_coc[M_COCINEROS];
