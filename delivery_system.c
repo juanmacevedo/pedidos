@@ -31,13 +31,19 @@ Cola cola_pendientes;
 Cola cola_listos;
 
 int ultimo_id        = 0;
+int total_generados   = 0;
+int total_preparados  = 0;
 int total_entregados = 0;
 
 pthread_mutex_t mutex_id         = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mutex_entregados = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_generados  = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_preparados = PTHREAD_MUTEX_INITIALIZER;
 
 void manejador(int sig) {
     printf("\n--- Resumen ---\n");
+    printf("Generados: %d\n", total_generados);
+    printf("Preparados: %d\n", total_preparados);
     printf("Entregados: %d\n", total_entregados);
     exit(0);
 }
@@ -93,6 +99,9 @@ void* productor(void* arg) {
         p.tipo_comida        = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
         p.entregado          = 0;
         sleep(2);
+        pthread_mutex_lock(&mutex_generados);
+        total_generados++;
+        pthread_mutex_unlock(&mutex_generados);
         printf("[PRODUCTOR  %d] Pedido #%d generado — tipo(%d) — preparacion(%ds) — entregado(%d)\n", id, p.id, p.tipo_comida, p.tiempo_preparacion, p.entregado);
         encolar(&cola_pendientes, p);
     }
@@ -103,8 +112,11 @@ void* cocinero(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p = desencolar(&cola_pendientes);
-        printf("[COCINERO   %d] Tomó pedido #%d — entregado(%d)\n", id, p.id, p.entregado);
+        printf("[COCINERO   %d] Tomó pedido #%d — preparacion(%ds)\n", id, p.id, p.tiempo_preparacion);
         sleep(p.tiempo_preparacion);
+        pthread_mutex_lock(&mutex_preparados);
+        total_preparados++;
+        pthread_mutex_unlock(&mutex_preparados);
         encolar(&cola_listos, p);
     }
     return NULL;
