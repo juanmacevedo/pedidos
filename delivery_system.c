@@ -87,7 +87,7 @@ void* productor(void* arg) {
     int id = *(int*)arg;
     while (1) {
         Pedido p;
-        unsigned int semilla = (unsigned int)pthread_self();
+        unsigned int semilla = (unsigned int)pthread_self() ^ (unsigned int)time(NULL);
         p.id                 = generar_id();
         p.tiempo_preparacion = rand_r(&semilla) % 3 + 3;  /* 3, 4, o 5 seg */
         p.tipo_comida        = p.tiempo_preparacion + 10;  /* 13, 14, o 15 */
